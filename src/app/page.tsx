@@ -1,103 +1,133 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useEffect } from "react";
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [rssUrl, setRssUrl] = useState("");
+  const [icalUrl, setIcalUrl] = useState("");
+  const [copied, setCopied] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+  // Generate iCal URL whenever RSS URL changes
+  useEffect(() => {
+    if (rssUrl.trim()) {
+      try {
+        // Validate URL format
+        new URL(rssUrl.trim());
+        const baseUrl =
+          process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+        const generatedIcalUrl = `${baseUrl}/api/ical?url=${encodeURIComponent(
+          rssUrl.trim()
+        )}`;
+        setIcalUrl(generatedIcalUrl);
+      } catch {
+        setIcalUrl("");
+      }
+    } else {
+      setIcalUrl("");
+    }
+  }, [rssUrl]);
+
+  const copyToClipboard = async () => {
+    try {
+      await navigator.clipboard.writeText(icalUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy to clipboard:", err);
+    }
+  };
+
+  return (
+    <div className="light">
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col px-4 py-2 sm:px-20 md:py-6 bg-white text-gray-900">
+        <section className="">
+          <h1 className="pb-2 text-4xl font-bold text-gray-900">rss to cal</h1>
+
+          <p className="py-6">
+            <b>Convert your RSS event stream to the ical format.</b> The vast
+            majority of the world works in the tried-and-true{" "}
+            <a href="https://datatracker.ietf.org/doc/html/rfc5545">ical</a>{" "}
+            format. Unfortunately, there&apos;s a handful of places that have
+            gone and used good &apos;ole RSS as an event stream. This tool
+            attempts to take the RSS data and stretch it into the ical format
+            and serve it out for use in web calendars. No guarantees of working,
+            or that this site will stay upright! If something doesn&apos;t seem
+            to be working right, feel free to reach out.
+          </p>
+        </section>
+
+        <section className="py-2 text-gray-600 md:py-6">
+          <div className="container mx-auto flex">
+            <div className="flex w-full flex-wrap">
+              <div className="relative flex w-full pb-6 md:pb-12">
+                <div className="relative z-10 hidden h-10 w-10 max-w-full flex-shrink-0 items-center justify-center rounded-full bg-stone-500 text-white sm:inline-flex">
+                  1
+                </div>
+                <div className="flex-grow sm:pl-4">
+                  <h2 className="title-font mb-1 text-sm font-medium tracking-wider text-gray-900">
+                    <span className="sm:hidden">1. </span>ENTER YOUR RSS FEED
+                    URL
+                  </h2>
+                  <p className="leading-relaxed">
+                    The direct link to an RSS feed being used as an event stream
+                  </p>
+                  <div className="relative my-3 flex w-full flex-wrap items-stretch">
+                    <input
+                      type="text"
+                      placeholder="https://api.calendar.moderncampus.net/pubcalendar/..."
+                      value={rssUrl}
+                      onChange={(e) => setRssUrl(e.target.value)}
+                      className="placeholder-blueGray-300 text-blueGray-600 border-blueGray-300 relative w-full rounded border bg-white px-3 py-3 text-sm outline-none focus:outline-none focus:ring"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="relative flex w-full">
+                <div className="relative z-10 hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-stone-500 text-white sm:inline-flex">
+                  2
+                </div>
+                <div className="flex-grow sm:pl-4">
+                  <h2 className="title-font mb-1 text-sm font-medium tracking-wider text-gray-900">
+                    <span className="sm:hidden">2. </span>COPY THE ASSEMBLED
+                    LINK
+                  </h2>
+                  <p className="leading-relaxed">
+                    This URL should go in the &quot;Add Other Calendar from
+                    URL&quot; section (
+                    <a
+                      href="https://calendar.google.com/calendar/u/0/r/settings/addbyurl?pli=1&sf=true&output=xml"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      link
+                    </a>
+                    )
+                  </p>
+                  <div className="my-3 bg-stone-100 p-3 text-stone-900 rounded">
+                    {icalUrl ? (
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 mr-4 break-all">{icalUrl}</div>
+                        <button
+                          onClick={copyToClipboard}
+                          className="px-3 py-1 bg-stone-500 text-white text-sm rounded hover:bg-stone-600 flex-shrink-0"
+                        >
+                          {copied ? "Copied!" : "Copy"}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-gray-500 italic">
+                        Enter an RSS URL above to generate your iCal link
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
 }
