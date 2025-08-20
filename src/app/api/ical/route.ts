@@ -34,14 +34,14 @@ export async function GET(request: NextRequest) {
     // Convert RSS to iCal
     const icalContent = convertRSSToICal(rssText, rssUrl);
 
-    // Return the iCal content with proper headers
+    // Return the iCal content with proper headers for calendar subscriptions
     return new NextResponse(icalContent, {
       headers: {
         "Content-Type": "text/calendar; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="calendar.ics"',
-        "Cache-Control": "no-cache, no-store, must-revalidate",
-        Pragma: "no-cache",
-        Expires: "0",
+        "Cache-Control": "public, max-age=3600", // Cache for 1 hour
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET",
+        "Access-Control-Allow-Headers": "Content-Type",
       },
     });
   } catch (error) {
@@ -86,14 +86,13 @@ function convertRSSToICal(rssText: string, sourceUrl: string): string {
   const channelTitle = channel.title || "RSS Calendar";
 
   // Start building iCal content
-  let icalContent = `BEGIN:VCALENDAR
-VERSION:2.0
-PRODID:-//RSS to iCal Converter//EN
-CALSCALE:GREGORIAN
-X-WR-CALNAME:${escapeText(channelTitle)}
-X-WR-CALDESC:Calendar converted from RSS feed
-X-WR-TIMEZONE:UTC
-METHOD:PUBLISH
+  let icalContent = `BEGIN:VCALENDAR\r
+VERSION:2.0\r
+PRODID:-//RSS to iCal Converter//EN\r
+CALSCALE:GREGORIAN\r
+X-WR-CALNAME:${escapeText(channelTitle)}\r
+X-WR-CALDESC:Calendar converted from RSS feed\r
+METHOD:PUBLISH\r
 `;
 
   // Convert each RSS item to a VEVENT
@@ -121,27 +120,29 @@ METHOD:PUBLISH
       new Date(eventDate.getTime() + 3600000)
     ); // 1 hour later
 
-    icalContent += `BEGIN:VEVENT
-UID:${uid}
-DTSTAMP:${dateTimeStamp}
-DTSTART:${eventDateFormatted}
-DTEND:${eventEndFormatted}
-SUMMARY:${escapeText(String(title))}
-DESCRIPTION:${escapeText(String(description))}
-URL:${String(link)}
-STATUS:CONFIRMED
-TRANSP:OPAQUE
-END:VEVENT
+    icalContent += `BEGIN:VEVENT\r
+UID:${uid}\r
+DTSTAMP:${dateTimeStamp}\r
+DTSTART:${eventDateFormatted}\r
+DTEND:${eventEndFormatted}\r
+SUMMARY:${escapeText(String(title))}\r
+DESCRIPTION:${escapeText(String(description))}\r
+URL:${String(link)}\r
+STATUS:CONFIRMED\r
+SEQUENCE:0\r
+END:VEVENT\r
 `;
   });
 
-  icalContent += "END:VCALENDAR\n";
+  icalContent += "END:VCALENDAR\r\n";
   return icalContent;
 }
 
 function generateUID(guid: string): string {
-  // Create a simple UID from the GUID
-  return guid.replace(/[^a-zA-Z0-9-]/g, "") + "@rss-to-ical.local";
+  // Create a more unique UID from the GUID
+  const cleanGuid = guid.replace(/[^a-zA-Z0-9-]/g, "");
+  const timestamp = Date.now();
+  return `${cleanGuid}-${timestamp}@rss-to-ical.local`;
 }
 
 function formatDateTimeStamp(date: Date): string {
@@ -153,12 +154,26 @@ function formatDateTimeStamp(date: Date): string {
 }
 
 function escapeText(text: string): string {
-  // Escape special characters for iCal format
-  return text
+  // Escape special characters for iCal format and handle line wrapping
+  const escaped = text
     .replace(/\\/g, "\\\\")
     .replace(/,/g, "\\,")
     .replace(/;/g, "\\;")
     .replace(/\n/g, "\\n")
     .replace(/\r/g, "")
     .substring(0, 1000); // Limit length to prevent issues
+
+  // Handle line wrapping at 75 characters as per RFC 5545
+  if (escaped.length > 75) {
+    let wrapped = "";
+    for (let i = 0; i < escaped.length; i += 75) {
+      if (i > 0) {
+        wrapped += "\r\n ";
+      }
+      wrapped += escaped.substring(i, i + 75);
+    }
+    return wrapped;
+  }
+
+  return escaped;
 }
