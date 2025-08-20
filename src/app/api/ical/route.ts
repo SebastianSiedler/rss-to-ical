@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { XMLParser } from "fast-xml-parser";
-import ical, { ICalCalendarMethod, ICalEventStatus } from "ical-generator";
+import ical, { ICalCalendarMethod } from "ical-generator";
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     const rssText = await response.text();
 
     // Convert RSS to iCal
-    const icalContent = convertRSSToICal(rssText, rssUrl);
+    const icalContent = convertRSSToICal(rssText);
 
     // Return the iCal content with proper headers for calendar subscriptions
     return new NextResponse(icalContent, {
@@ -62,7 +62,7 @@ interface RSSItem {
   guid?: string | { "#text": string };
 }
 
-function convertRSSToICal(rssText: string, sourceUrl: string): string {
+function convertRSSToICal(rssText: string): string {
   // Parse RSS XML using fast-xml-parser
   const parser = new XMLParser({
     ignoreAttributes: false,
@@ -91,7 +91,6 @@ function convertRSSToICal(rssText: string, sourceUrl: string): string {
     name: channelTitle,
     description: "Calendar converted from RSS feed",
     method: ICalCalendarMethod.PUBLISH,
-    prodId: "//RSS to iCal Converter//EN",
   });
 
   // Convert each RSS item to a VEVENT
@@ -100,7 +99,7 @@ function convertRSSToICal(rssText: string, sourceUrl: string): string {
     const description = item.description || "";
     const link = item.link || "";
     const pubDate = item.pubDate;
-    const guid = item.guid || `${sourceUrl}#${index}`;
+    const guid = item.guid || `event-${index}`;
 
     // Parse date - try different date formats commonly found in RSS
     let eventDate = new Date();
@@ -115,25 +114,35 @@ function convertRSSToICal(rssText: string, sourceUrl: string): string {
     const eventEndDate = new Date(eventDate.getTime() + 3600000);
 
     // Generate UID
-    const uid = generateUID(typeof guid === "string" ? guid : String(guid));
+    const uid = generateUID(
+      typeof guid === "string" ? guid : String(guid),
+      index
+    );
 
-    calendar.createEvent({
-      id: uid,
-      start: eventDate,
-      end: eventEndDate,
-      summary: String(title),
-      description: String(description),
-      url: String(link),
-      status: ICalEventStatus.CONFIRMED,
-    });
+    try {
+      const event = calendar.createEvent({
+        start: eventDate,
+        end: eventEndDate,
+        summary: String(title).substring(0, 255), // Limit summary length
+        description: String(description).substring(0, 1000), // Limit description length
+        url: String(link),
+      });
+      event.uid(uid); // Set UID separately
+    } catch (error) {
+      console.warn(`Failed to create event ${index}:`, error);
+      // Skip this event and continue with others
+    }
   });
 
   return calendar.toString();
 }
 
-function generateUID(guid: string): string {
-  // Create a more unique UID from the GUID
-  const cleanGuid = guid.replace(/[^a-zA-Z0-9-]/g, "");
-  const timestamp = Date.now();
+function generateUID(guid: string, index: number): string {
+  // Create a shorter, more reliable UID
+  let cleanGuid = guid.replace(/[^a-zA-Z0-9-]/g, "").substring(0, 20);
+  if (!cleanGuid) {
+    cleanGuid = `event-${index}`;
+  }
+  const timestamp = Date.now().toString().slice(-8); // Last 8 digits of timestamp
   return `${cleanGuid}-${timestamp}@rss-to-ical.local`;
 }
